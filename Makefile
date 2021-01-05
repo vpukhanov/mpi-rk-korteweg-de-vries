@@ -1,14 +1,5 @@
-CC = cc
-CFLAGS_COMMON = -fopenmp -std=c90 -Wall
-
-# macOS clang does not build against omp symbols without
-# some additional flags :(
-OS := $(shell uname -s)
-ifeq ($(OS), Darwin)
-	CFLAGS = -Xpreprocessor $(CFLAGS_COMMON) -lomp
-else
-	CFLAGS = $(CFLAGS_COMMON)
-endif
+CC = mpicc
+CFLAGS = -std=c90 -Wall
 
 C := $(CC) $(CFLAGS)
 

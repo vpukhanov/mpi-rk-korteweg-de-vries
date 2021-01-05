@@ -1,20 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <omp.h>
+#include <mpi.h>
 
 #include "rk.h"
 
 FILE *foutput;
+int mpi_size, mpi_rank, region_start, region_end, steps_num;
 
-void print_report(double *, double, int);
+void print_report(double *, double);
 
-/* main [points factor=10] [omp threads count=4] */
+/* mpiexec -n <number of processes> main [points factor=10] */
 int main(int argc, char **argv) {
     int points_factor = argc >= 2 ? atoi(argv[1]) : 10;
-    int threads_count = argc >= 3 ? atoi(argv[2]) : 4;
 
-    int steps_num = 50 * points_factor;
+    steps_num = 50 * points_factor;
 
     double start = 0;
     double end = 10;
@@ -22,36 +22,42 @@ int main(int argc, char **argv) {
 
     double *x = (double *) malloc(steps_num * sizeof(double));
 
-    double t1, t2;
     int i;
 
-    omp_set_num_threads(threads_count);
-    t1 = omp_get_wtime();
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
-#pragma omp parallel for shared(x, steps_num) private(i)
-    for (i = 0; i < steps_num; i++) {
+    region_start = steps_num / mpi_size * mpi_rank;
+    region_end = steps_num / mpi_size * (mpi_rank + 1);
+
+    for (i = region_start; i < region_end; i++) {
         double ox = i * 0.1;
         double oxcosh = cosh(ox - 25);
         x[i] = 2 / (oxcosh * oxcosh);
     }
 
-    foutput = fopen("output.txt", "w");
-    runge_kutta(x, step, steps_num, start, end, print_report);
-    fclose(foutput);
+    if (mpi_rank == 0) {
+        foutput = fopen("output.txt", "w");
+    }
 
-    t2 = omp_get_wtime();
-    printf("Total time for %d threads: %.5f", threads_count, t2 - t1);
+    runge_kutta(x, step, start, end, mpi_rank == 0 ? print_report : NULL);
+
+    if (mpi_rank == 0) {
+        fclose(foutput);
+    }
 
     free(x);
+    MPI_Finalize();
 
     return 0;
 }
 
-void print_report(double *arr, double t, int num) {
+void print_report(double *arr, double t) {
     int i;
 
     fprintf(foutput, "%.5f\n", t);
-    for (i = 0; i < num; i++) {
+    for (i = 0; i < steps_num; i++) {
         fprintf(foutput, "%.5f ", arr[i]);
     }
 

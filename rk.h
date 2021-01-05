@@ -1,6 +1,8 @@
 #ifndef RK_H
 #define RK_H
 
-void runge_kutta(double *, double, int, double, double, void (double *, double, int));
+extern int mpi_size, mpi_rank, region_start, region_end, steps_num;
+
+void runge_kutta(double *, double, double, double, void (double *, double));
 
 #endif
